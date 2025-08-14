@@ -102,11 +102,13 @@ jobs:
       - name: Sign Docker Images with Cosign (Keyless)
         run: |
           for arch in amd64 i386 armhf arm64v8 riscv64; do
-            cosign sign --identity-token=${{ secrets.GITHUB_TOKEN }} ${{ inputs.docker_namespace }}/goreleaser-example:${arch}-${{ github.ref_name }}
-            cosign sign --identity-token=${{ secrets.GITHUB_TOKEN }} ${{ inputs.docker_namespace }}/goreleaser-example:${arch}-latest
-            cosign sign --identity-token=${{ secrets.GITHUB_TOKEN }} ghcr.io/${{ inputs.ghcr_namespace }}/goreleaser-example:${arch}-${{ github.ref_name }}
-            cosign sign --identity-token=${{ secrets.GITHUB_TOKEN }} ghcr.io/${{ inputs.ghcr_namespace }}/goreleaser-example:${arch}-latest
+            cosign sign ${{ inputs.docker_namespace }}/eui64-calculator:${arch}-${{ github.ref_name }}
+            cosign sign ${{ inputs.docker_namespace }}/eui64-calculator:${arch}-latest
+            cosign sign ghcr.io/${{ inputs.ghcr_namespace }}/eui64-calculator:${arch}-${{ github.ref_name }}
+            cosign sign ghcr.io/${{ inputs.ghcr_namespace }}/eui64-calculator:${arch}-latest
           done
+        env:
+          COSIGN_EXPERIMENTAL: "true"
         shell: bash
 
       - name: Upload binary SBOMs # Upload SBOMs for prod builds.
