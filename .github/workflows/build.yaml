@@ -106,8 +106,8 @@ jobs:
       - name: Sign Docker Images with Cosign (Keyless)
         run: |
           for arch in amd64 i386 armhf arm64v8 riscv64; do
-            cosign sign ${{ inputs.docker_namespace }}/${{ inputs.project_name }}:${arch}-${{ github.ref_name }}
-            cosign sign ${{ inputs.docker_namespace }}/${{ inputs.project_name }}:${arch}-latest
+            # cosign sign ${{ inputs.docker_namespace }}/${{ inputs.project_name }}:${arch}-${{ github.ref_name }}
+            # cosign sign ${{ inputs.docker_namespace }}/${{ inputs.project_name }}:${arch}-latest
             cosign sign ghcr.io/${{ inputs.ghcr_namespace }}/${{ inputs.project_name }}:${arch}-${{ github.ref_name }}
             cosign sign ghcr.io/${{ inputs.ghcr_namespace }}/${{ inputs.project_name }}:${arch}-latest
           done
