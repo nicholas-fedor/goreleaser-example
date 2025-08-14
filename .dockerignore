@@ -1,0 +1,13 @@
+# Ignore Git files and directories
+.git
+.gitignore
+.gitattributes
+
+# Ignore CI/CD and configuration files
+.github/
+
+# Ignore documentation and examples
+*.md
+
+# Ignore GoReleaser build artifacts
+dist/

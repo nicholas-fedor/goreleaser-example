@@ -1,0 +1,26 @@
+name: Release
+
+on:
+  # Manual runs
+  workflow_dispatch:
+  # Tag pushes (e.g., v1.2.3)
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+" # Semantic version tags
+
+jobs:
+  # Build binaries, images, SBOMs, and attestations
+  build:
+    uses: ./.github/workflows/build.yaml
+    permissions:
+      contents: write # For code checkout and publishing releases
+      packages: write # For pushing images to registries
+      attestations: write # For generating provenance and SBOMs
+      id-token: write # For OIDC auth to Docker Hub and GHCR
+
+  create-manifests:
+    uses: ./.github/workflows/create-manifests.yaml
+    needs: build
+    permissions:
+      packages: write # For pushing manifests to GHCR
+      contents: read # For accessing repository metadata
