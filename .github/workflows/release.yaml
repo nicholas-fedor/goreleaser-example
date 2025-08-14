@@ -20,6 +20,7 @@ jobs:
     secrets: inherit
     uses: ./.github/workflows/build.yaml
     with:
+      project_name: goreleaser-example
       # docker_namespace: nickfedor
       ghcr_namespace: nicholas-fedor
 
