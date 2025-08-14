@@ -106,13 +106,16 @@ jobs:
       - name: Sign Docker Images with Cosign (Keyless)
         run: |
           for arch in amd64 i386 armhf arm64v8 riscv64; do
-            # cosign sign ${{ inputs.docker_namespace }}/${{ inputs.project_name }}:${arch}-${{ github.ref_name }}
-            # cosign sign ${{ inputs.docker_namespace }}/${{ inputs.project_name }}:${arch}-latest
-            cosign sign ghcr.io/${{ inputs.ghcr_namespace }}/${{ inputs.project_name }}:${arch}-${{ github.ref_name }}
-            cosign sign ghcr.io/${{ inputs.ghcr_namespace }}/${{ inputs.project_name }}:${arch}-latest
+            # Get the digest for the versioned tag
+            digest_version=$(docker buildx imagetools inspect ghcr.io/${{ inputs.ghcr_namespace }}/${{ inputs.project_name }}:${arch}-${{ github.ref_name }} --format '{{ .Manifest.digest }}')
+            cosign sign ghcr.io/${{ inputs.ghcr_namespace }}/${{ inputs.project_name }}@${digest_version}
+            # Get the digest for the latest tag
+            digest_latest=$(docker buildx imagetools inspect ghcr.io/${{ inputs.ghcr_namespace }}/${{ inputs.project_name }}:${arch}-latest --format '{{ .Manifest.digest }}')
+            cosign sign ghcr.io/${{ inputs.ghcr_namespace }}/${{ inputs.project_name }}@${digest_latest}
           done
         env:
           COSIGN_EXPERIMENTAL: "true"
+          COSIGN_YES: "true" # Automatically accept Sigstore terms
         shell: bash
 
       - name: Upload binary SBOMs # Upload SBOMs for prod builds.
