@@ -1,42 +1,44 @@
-# Workflow to create multi-architecture Docker manifests for the goreleaser-example project.
-# Runs after build.yaml or on manual dispatch, combining architecture-specific image
-# manifests (e.g., amd64, i386) into multi-arch manifests (e.g., :0.1.0, :latest) using
-# docker buildx imagetools create, which also pushes to the registry.
-# Supports multiple registries (currently GHCR, with Docker Hub commented out).
-# Ensures attestations (provenance, SBOM) remain associated via architecture-specific indices.
 name: Create Docker Manifests
 
 on:
-  # Triggered when the Build Release workflow completes successfully
   workflow_call:
-  # Allows manual triggering via the GitHub Actions UI
-  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version tag for production builds"
+        required: false
+        type: string
+      project_name:
+        description: "Name of the project for Docker image names"
+        required: true
+        type: string
+      docker_namespace:
+        description: "Docker Hub namespace for image names (e.g., 'nickfedor')"
+        required: false
+        type: string
+      ghcr_namespace:
+        description: "GitHub Container Registry namespace for image names (e.g., 'nicholas-fedor')"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  packages: write
 
 jobs:
-  create-manifests:
+  manifest:
     runs-on: ubuntu-latest
-    permissions:
-      # Required to push manifests to registries
-      packages: write
-      # Required to access repository metadata (e.g., tags)
-      contents: read
-    env:
-      # List of registries to push manifests to (add more as needed)
-      REGISTRIES: '["ghcr.io/nicholas-fedor/goreleaser-example"]'
-      # Docker Hub registry (commented out, uncomment to enable)
-      # REGISTRIES: '["ghcr.io/nicholas-fedor/goreleaser-example", "nickfedor/goreleaser-example"]'
-      # Extract version from tag (e.g., '0.1.0' from 'v0.1.0')
-      VERSION: ${{ github.ref_name }}
-      # Architecture tags as used in image names
-      ARCH_TAGS: '["amd64", "i386", "armhf", "arm64v8", "riscv64"]'
-      # Platform specifications: architecture:variant (variant empty if none)
-      PLATFORMS: '["amd64:", "386:", "arm:v6", "arm64:", "riscv64:"]'
     steps:
-      # Install jq for parsing JSON output from docker manifest inspect
-      - name: Install jq
-        run: sudo apt-get update && sudo apt-get install -y jq
+      - name: Checkout code
+        uses: actions/checkout@ff7abcd0c3c05ccf6adc123a8cd1fd4fb30fb493
+        with:
+          fetch-depth: 0
 
-      # Authenticate to GHCR using the GITHUB_TOKEN
+      - name: Login to Docker Hub
+        uses: docker/login-action@184bdaa0721073962dff0199f1fb9940f07167d1
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
       - name: Login to GHCR
         uses: docker/login-action@184bdaa0721073962dff0199f1fb9940f07167d1
         with:
@@ -44,128 +46,42 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ github.token }}
 
-      # Authenticate to Docker Hub (commented out, uncomment to enable)
-      # - name: Login to Docker Hub
-      #   uses: docker/login-action@184bdaa0721073962dff0199f1fb9940f07167d1
-      #   with:
-      #     registry: docker.io
-      #     username: ${{ secrets.DOCKERHUB_USERNAME }}
-      #     password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-      # Clean up existing multi-arch manifests to prevent conflicts
-      - name: Clean up existing manifests
+      - name: Create Docker manifests
         run: |
-          # Parse registries from environment variable
-          REGISTRIES=($(echo "${REGISTRIES}" | jq -r '.[]'))
-          # Strip 'v' prefix from VERSION if present
-          VERSION=${VERSION#v}
-          # Remove multi-arch manifests for the version and 'latest' tags in each registry
-          for repo in "${REGISTRIES[@]}"; do
-            for tag in "${VERSION}" latest; do
-              docker manifest rm ${repo}:${tag} || true
-            done
-          done
-        continue-on-error: true # Continue even if cleanup fails (e.g., manifests don't exist)
+          # docker buildx imagetools create -t ${{ inputs.docker_namespace }}/${{ inputs.project_name }}:${{ inputs.version }} \
+          #   ${{ inputs.docker_namespace }}/${{ inputs.project_name }}:amd64-${{ inputs.version }} \
+          #   ${{ inputs.docker_namespace }}/${{ inputs.project_name }}:i386-${{ inputs.version }} \
+          #   ${{ inputs.docker_namespace }}/${{ inputs.project_name }}:armhf-${{ inputs.version }} \
+          #   ${{ inputs.docker_namespace }}/${{ inputs.project_name }}:arm64v8-${{ inputs.version }} \
+          #   ${{ inputs.docker_namespace }}/${{ inputs.project_name }}:riscv64-${{ inputs.version }}
+          # docker buildx imagetools create -t ${{ inputs.docker_namespace }}/${{ inputs.project_name }}:latest \
+          #   ${{ inputs.docker_namespace }}/${{ inputs.project_name }}:amd64-latest \
+          #   ${{ inputs.docker_namespace }}/${{ inputs.project_name }}:i386-latest \
+          #   ${{ inputs.docker_namespace }}/${{ inputs.project_name }}:armhf-latest \
+          #   ${{ inputs.docker_namespace }}/${{ inputs.project_name }}:arm64v8-latest \
+          #   ${{ inputs.docker_namespace }}/${{ inputs.project_name }}:riscv64-latest
+          docker buildx imagetools create -t ghcr.io/${{ inputs.ghcr_namespace }}/${{ inputs.project_name }}:${{ inputs.version }} \
+            ghcr.io/${{ inputs.ghcr_namespace }}/${{ inputs.project_name }}:amd64-${{ inputs.version }} \
+            ghcr.io/${{ inputs.ghcr_namespace }}/${{ inputs.project_name }}:i386-${{ inputs.version }} \
+            ghcr.io/${{ inputs.ghcr_namespace }}/${{ inputs.project_name }}:armhf-${{ inputs.version }} \
+            ghcr.io/${{ inputs.ghcr_namespace }}/${{ inputs.project_name }}:arm64v8-${{ inputs.version }} \
+            ghcr.io/${{ inputs.ghcr_namespace }}/${{ inputs.project_name }}:riscv64-${{ inputs.version }}
+          docker buildx imagetools create -t ghcr.io/${{ inputs.ghcr_namespace }}/${{ inputs.project_name }}:latest \
+            ghcr.io/${{ inputs.ghcr_namespace }}/${{ inputs.project_name }}:amd64-latest \
+            ghcr.io/${{ inputs.ghcr_namespace }}/${{ inputs.project_name }}:i386-latest \
+            ghcr.io/${{ inputs.ghcr_namespace }}/${{ inputs.project_name }}:armhf-latest \
+            ghcr.io/${{ inputs.ghcr_namespace }}/${{ inputs.project_name }}:arm64v8-latest \
+            ghcr.io/${{ inputs.ghcr_namespace }}/${{ inputs.project_name }}:riscv64-latest
 
-      # Inspect and save manifests for all architectures
-      - name: Inspect manifests
+      - name: Install Cosign
         run: |
-          # Parse registries and architecture tags
-          REGISTRIES=($(echo "${REGISTRIES}" | jq -r '.[]'))
-          ARCH_TAGS=($(echo "${ARCH_TAGS}" | jq -r '.[]'))
-          # Strip 'v' prefix from VERSION if present
-          VERSION=${VERSION#v}
-          # Inspect each architecture's manifest for each registry
-          for repo in "${REGISTRIES[@]}"; do
-            for arch in "${ARCH_TAGS[@]}"; do
-              echo "Inspecting ${repo}:${arch}-${VERSION}"
-              docker manifest inspect ${repo}:${arch}-${VERSION} > manifest-${repo//\//-}-${arch}.json
-              jq '.' manifest-${repo//\//-}-${arch}.json || echo "Failed to inspect ${arch} for ${repo}"
-            done
-          done
-        continue-on-error: true # Continue even if inspection fails
+          curl -sSfL https://github.com/sigstore/cosign/releases/latest/download/cosign-linux-amd64 -o /usr/local/bin/cosign
+          chmod +x /usr/local/bin/cosign
 
-      # Extract digests and create manifests
-      - name: Extract digests and create manifests
+      - name: Sign Docker Manifests with Cosign (Keyless)
         run: |
-          # Parse registries, architecture tags, and platforms
-          REGISTRIES=($(echo "${REGISTRIES}" | jq -r '.[]'))
-          ARCH_TAGS=($(echo "${ARCH_TAGS}" | jq -r '.[]'))
-          PLATFORMS=($(echo "${PLATFORMS}" | jq -r '.[]'))
-          # Strip 'v' prefix from VERSION if present
-          VERSION=${VERSION#v}
-          # Iterate over registries
-          for repo in "${REGISTRIES[@]}"; do
-            # Initialize refs arrays for version and latest
-            VERSION_REFS=()
-            LATEST_REFS=()
-            # Iterate over architectures
-            for i in "${!ARCH_TAGS[@]}"; do
-              arch=${ARCH_TAGS[i]}
-              plat=${PLATFORMS[i]}
-              plat_arch="${plat%:*}"  # Extract architecture (e.g., 'arm')
-              plat_variant="${plat#*:}"  # Extract variant (e.g., 'v6')
-              [ "$plat_variant" = "$plat_arch" ] && plat_variant=""  # Empty variant if none
-              # Process version and latest tags
-              for tag_suffix in "${VERSION}" "latest"; do
-                arch_tag="${repo}:${arch}-${tag_suffix}"
-                # Extract the image manifest digest, excluding attestation manifests
-                image_digest=$(docker manifest inspect ${arch_tag} | jq -r ".manifests[] | select(
-                  .platform.os == \"linux\" and
-                  .platform.architecture == \"${plat_arch}\" and
-                  (.platform.variant == \"${plat_variant}\" or (.platform.variant == null and \"${plat_variant}\" == \"\")) and
-                  .platform.architecture != \"unknown\" and
-                  .platform.os != \"unknown\" and
-                  (.mediaType == \"application/vnd.oci.image.manifest.v1+json\" or .mediaType == \"application/vnd.docker.distribution.manifest.v2+json\")
-                ) | .digest")
-                # Check if digest extraction succeeded
-                if [ -z "$image_digest" ]; then
-                  echo "Error: Failed to extract image manifest digest for ${arch_tag} (platform: linux/${plat_arch}${plat_variant:+/${plat_variant}})"
-                  docker manifest inspect ${arch_tag}
-                  exit 1
-                fi
-                # Log the digest for debugging
-                echo "Using image digest for ${arch_tag}: ${image_digest}"
-                # Add to appropriate refs array with registry prefix
-                if [ "$tag_suffix" = "${VERSION}" ]; then
-                  VERSION_REFS+=("${repo}:${arch}-${tag_suffix}@${image_digest}")
-                else
-                  LATEST_REFS+=("${repo}:${arch}-${tag_suffix}@${image_digest}")
-                fi
-                # Log attestation digests for verification
-                attestation_digests=$(docker manifest inspect ${arch_tag} | jq -r '.manifests[] | select(
-                  .platform.os == "unknown" and .platform.architecture == "unknown"
-                ) | .digest')
-                echo "Attestation digests for ${arch_tag}:"
-                echo "$attestation_digests"
-              done
-            done
-            # Create version manifest
-            if [ ${#VERSION_REFS[@]} -gt 0 ]; then
-              echo "Creating and pushing manifest for ${repo}:${VERSION} with refs:"
-              printf '%s\n' "${VERSION_REFS[@]}"
-              docker buildx imagetools create -t "${repo}:${VERSION}" "${VERSION_REFS[@]}"
-              if [ $? -ne 0 ]; then
-                echo "Error: Failed to create and push manifest for ${repo}:${VERSION}"
-                for ref in "${VERSION_REFS[@]}"; do
-                  echo "Inspecting ${ref}"
-                  docker manifest inspect "${ref}" || echo "Failed to inspect ${ref}"
-                done
-                exit 1
-              fi
-            fi
-            # Create latest manifest
-            if [ ${#LATEST_REFS[@]} -gt 0 ]; then
-              echo "Creating and pushing manifest for ${repo}:latest with refs:"
-              printf '%s\n' "${LATEST_REFS[@]}"
-              docker buildx imagetools create -t "${repo}:latest" "${LATEST_REFS[@]}"
-              if [ $? -ne 0 ]; then
-                echo "Error: Failed to create and push manifest for ${repo}:latest"
-                for ref in "${LATEST_REFS[@]}"; do
-                  echo "Inspecting ${ref}"
-                  docker manifest inspect "${ref}" || echo "Failed to inspect ${ref}"
-                done
-                exit 1
-              fi
-            fi
-          done
+          # cosign sign --identity-token=${{ secrets.GITHUB_TOKEN }} ${{ inputs.docker_namespace }}/${{ inputs.project_name }}:${{ inputs.version }}
+          # cosign sign --identity-token=${{ secrets.GITHUB_TOKEN }} ${{ inputs.docker_namespace }}/${{ inputs.project_name }}:latest
+          cosign sign --identity-token=${{ secrets.GITHUB_TOKEN }} ghcr.io/${{ inputs.ghcr_namespace }}/${{ inputs.project_name }}:${{ inputs.version }}
+          cosign sign --identity-token=${{ secrets.GITHUB_TOKEN }} ghcr.io/${{ inputs.ghcr_namespace }}/${{ inputs.project_name }}:latest
+        shell: bash

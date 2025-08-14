@@ -2,6 +2,15 @@ name: Build Release
 
 on:
   workflow_call:
+    inputs:
+      docker_namespace:
+        description: "Docker Hub namespace for image names (e.g., 'nickfedor')"
+        required: false
+        type: string
+      ghcr_namespace:
+        description: "GitHub Container Registry namespace for image names (e.g., 'nicholas-fedor')"
+        required: true
+        type: string
 
 jobs:
   # Build binaries, images, SBOMs, and attestations for production or development
@@ -9,6 +18,8 @@ jobs:
     runs-on: ubuntu-latest
     env:
       DOCKER_CLI_EXPERIMENTAL: "enabled"
+      CGO_ENABLED: 0
+      TAG: ${{ github.ref_name }}
     permissions:
       contents: write # For code checkout and publishing releases
       packages: write # For pushing images to registries
@@ -24,6 +35,15 @@ jobs:
         uses: actions/setup-go@8e57b58e57be52ac95949151e2777ffda8501267
         with:
           go-version: 1.25.x
+
+      - name: Cache Go modules
+        uses: actions/cache@0400d5f644dc74513175e3cd8d07132dd4860809 # v4
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: ${{ runner.os }}-go-
 
       - name: Set up QEMU # Enable multi-platform emulation.
         uses: docker/setup-qemu-action@05340d1c670183e7caabdb33ae9f1c80fae3b0c2
@@ -45,6 +65,18 @@ jobs:
       - name: Install Syft for SBOM generation # Install Syft for GoReleaser SBOM generation
         run: curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin
 
+      - name: Import GPG key
+        uses: crazy-max/ghaction-import-gpg@e89d40939c28e39f97cf32126055eeae86ba74ec
+        with:
+          gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
+          passphrase: ${{ secrets.GPG_PASSPHRASE }}
+
+      # - name: Login to Docker Hub
+      #   uses: docker/login-action@184bdaa0721073962dff0199f1fb9940f07167d1
+      #   with:
+      #     username: ${{ secrets.DOCKERHUB_USERNAME }}
+      #     password: ${{ secrets.DOCKERHUB_TOKEN }}
+
       - name: Login to GHCR # Authenticate to GHCR
         uses: docker/login-action@184bdaa0721073962dff0199f1fb9940f07167d1
         with:
@@ -59,6 +91,23 @@ jobs:
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ github.token }}
+          # DOCKER_NAMESPACE: ${{ inputs.docker_namespace }}
+          GHCR_NAMESPACE: ${{ inputs.ghcr_namespace }}
+
+      - name: Install Cosign
+        run: |
+          curl -sSfL https://github.com/sigstore/cosign/releases/latest/download/cosign-linux-amd64 -o /usr/local/bin/cosign
+          chmod +x /usr/local/bin/cosign
+
+      - name: Sign Docker Images with Cosign (Keyless)
+        run: |
+          for arch in amd64 i386 armhf arm64v8 riscv64; do
+            cosign sign --identity-token=${{ secrets.GITHUB_TOKEN }} ${{ inputs.docker_namespace }}/goreleaser-example:${arch}-${{ github.ref_name }}
+            cosign sign --identity-token=${{ secrets.GITHUB_TOKEN }} ${{ inputs.docker_namespace }}/goreleaser-example:${arch}-latest
+            cosign sign --identity-token=${{ secrets.GITHUB_TOKEN }} ghcr.io/${{ inputs.ghcr_namespace }}/goreleaser-example:${arch}-${{ github.ref_name }}
+            cosign sign --identity-token=${{ secrets.GITHUB_TOKEN }} ghcr.io/${{ inputs.ghcr_namespace }}/goreleaser-example:${arch}-latest
+          done
+        shell: bash
 
       - name: Upload binary SBOMs # Upload SBOMs for prod builds.
         uses: actions/upload-artifact@de65e23aa2b7e23d713bb51fbfcb6d502f8667d8

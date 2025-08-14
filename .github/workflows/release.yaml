@@ -11,16 +11,28 @@ on:
 jobs:
   # Build binaries, images, SBOMs, and attestations
   build:
-    uses: ./.github/workflows/build.yaml
+    name: Build the Release
     permissions:
-      contents: write # For code checkout and publishing releases
-      packages: write # For pushing images to registries
-      attestations: write # For generating provenance and SBOMs
-      id-token: write # For OIDC auth to Docker Hub and GHCR
+      contents: write
+      packages: write
+      attestations: write
+      id-token: write
+    secrets: inherit
+    uses: ./.github/workflows/build.yaml
+    with:
+      # docker_namespace: nickfedor
+      ghcr_namespace: nicholas-fedor
 
-  create-manifests:
-    uses: ./.github/workflows/create-manifests.yaml
+  manifest:
+    name: Create image manifests
     needs: build
     permissions:
-      packages: write # For pushing manifests to GHCR
-      contents: read # For accessing repository metadata
+      contents: read # For code checkout
+      packages: write # For pushing manifests
+    secrets: inherit
+    uses: ./.github/workflows/create-manifests.yaml
+    with:
+      version: ${{ github.ref_name }} # Tag name (e.g., v1.2.3)
+      project_name: goreleaser-example
+      # docker_namespace: nickfedor
+      ghcr_namespace: nicholas-fedor
