@@ -159,12 +159,66 @@ archives:
 ######################################################################################################
 
 ######################################################################################################
-# Creates SBOMs of all archives using syft
-# https://goreleaser.com/customization/sbom
+# SBOM Generation Configuration
+# https://goreleaser.com/customization/sbom/
 ######################################################################################################
 sboms:
-  # Which artifacts to catalog.
-  - artifacts: archive
+  - # List of names of the SBOM documents created at this step
+    # (relative to the dist dir).
+    #
+    # Each element configured is made available as variables. For example:
+    #   documents: ["foo", "bar"]
+    #
+    # would make the following variables that can be referenced as template keys:
+    #   document0: "foo"
+    #   document1: "bar"
+    #
+    # Note that multiple sbom values are only allowed if the value of
+    # "artifacts" is "any".
+    #
+    # Default:
+    #   When "binary":   ["{{ .Binary }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}.sbom.json"]
+    #   When "any":      []
+    #   Otherwise:       ["{{ .ArtifactName }}.sbom.json"]
+    # Templates: allowed.
+    documents:
+      - "{{ .ArtifactName }}.sbom.json"
+
+    # Path to the SBOM generator command
+    #
+    # Note: the process CWD will be set to the same location as "dist"
+    #
+    # Default: 'syft'.
+    cmd: syft
+
+    # Command line arguments for the command
+    #
+    # Default: ["$artifact", "--output", "spdx-json=$document"].
+    # Templates: allowed.
+    args:
+      - "$artifact"
+      - "--output"
+      - "spdx-json=$document"
+
+    # List of environment variables that will be passed to the SBOM command as
+    # well as the templates.
+    #
+    # Default: [ "SYFT_FILE_METADATA_CATALOGER_ENABLED=true" ].
+
+    # Which artifacts to catalog.
+    #
+    # Valid options are:
+    # - any:        let the SBOM tool decide which artifacts available in
+    #               the cwd should be cataloged
+    # - source:     source archive
+    # - package:    Linux packages (deb, rpm, apk, etc)
+    # - installer:  Windows MSI installers (Pro only)
+    # - diskimage:  macOS DMG disk images (Pro only)
+    # - archive:    archives from archive pipe
+    # - binary:     binaries output from the build stage
+    #
+    # Default: 'archive'.
+    artifacts: archive
 ######################################################################################################
 
 ######################################################################################################
@@ -175,7 +229,11 @@ dockers:
   - ##################################################################################################
     # goreleaser-example:amd64
     ##################################################################################################
+    # ID of the image, used to reference in the `docker_signs` section.
+    id: amd64
+
     # GOOS of the built binaries/packages that should be used.
+    # Default: 'linux'.
     goos: linux
 
     # GOARCH of the built binaries/packages that should be used.
@@ -222,10 +280,15 @@ dockers:
       - "--label=org.opencontainers.image.revision={{ .FullCommit }}"
       # Points to the source repository URL
       - "--label=org.opencontainers.image.source={{ .GitURL }}"
+
   - ##################################################################################################
     # goreleaser-example:i386
     ##################################################################################################
+    # ID of the image, used to reference in the `docker_signs` section.
+    id: i386
+
     # GOOS of the built binaries/packages that should be used.
+    # Default: 'linux'.
     goos: linux
 
     # GOARCH of the built binaries/packages that should be used.
@@ -269,9 +332,13 @@ dockers:
       - "--label=org.opencontainers.image.revision={{ .FullCommit }}"
       # Points to the source repository URL
       - "--label=org.opencontainers.image.source={{ .GitURL }}"
+
   - ##################################################################################################
     # goreleaser-example:armhf
     ##################################################################################################
+    # ID of the image, used to reference in the `docker_signs` section.
+    id: armhf
+
     # GOOS of the built binaries/packages that should be used.
     goos: linux
 
@@ -320,9 +387,13 @@ dockers:
       - "--label=org.opencontainers.image.revision={{ .FullCommit }}"
       # Points to the source repository URL
       - "--label=org.opencontainers.image.source={{ .GitURL }}"
+
   - ##################################################################################################
     # goreleaser-example:arm64v8
     ##################################################################################################
+    # ID of the image, used to reference in the `docker_signs` section.
+    id: arm64v8
+
     # GOOS of the built binaries/packages that should be used.
     goos: linux
 
@@ -373,6 +444,9 @@ dockers:
   - ##################################################################################################
     # goreleaser-example:riscv64
     ##################################################################################################
+    # ID of the image, used to reference in the `docker_signs` section.
+    id: riscv64
+
     # GOOS of the built binaries/packages that should be used.
     # Default: 'linux'.
     goos: linux
@@ -418,15 +492,205 @@ dockers:
       - "--label=org.opencontainers.image.revision={{ .FullCommit }}"
       # Points to the source repository URL
       - "--label=org.opencontainers.image.source={{ .GitURL }}"
+
 ######################################################################################################
+# Docker Manifest Configuration
+# https://goreleaser.com/customization/docker_manifest/
+######################################################################################################
+docker_manifests:
+  - # ID of the manifest, used to reference in the `docker_signs` section.
+    id: ghcr
+
+    # Name template for the manifest.
+    # Templates: allowed.
+    name_template: "ghcr.io/{{ .Env.GHCR_NAMESPACE }}/{{ .ProjectName }}:{{ .Tag }}"
+
+    # List of image templates to include in the manifest.
+    image_templates:
+      - "ghcr.io/{{ .Env.GHCR_NAMESPACE }}/{{ .ProjectName }}:amd64-{{ .Tag }}"
+      - "ghcr.io/{{ .Env.GHCR_NAMESPACE }}/{{ .ProjectName }}:i386-{{ .Tag }}"
+      - "ghcr.io/{{ .Env.GHCR_NAMESPACE }}/{{ .ProjectName }}:armhf-{{ .Tag }}"
+      - "ghcr.io/{{ .Env.GHCR_NAMESPACE }}/{{ .ProjectName }}:arm64v8-{{ .Tag }}"
+      - "ghcr.io/{{ .Env.GHCR_NAMESPACE }}/{{ .ProjectName }}:riscv64-{{ .Tag }}"
+
+    # Whether to skip pushing the manifest to the registry.
+    # Default: false
+    skip_push: false
+
+  - # ID of the manifest, used to reference in the `docker_signs` section.
+    id: ghcr_latest
+
+    # Name template for the manifest.
+    # Templates: allowed.
+    name_template: "ghcr.io/{{ .Env.GHCR_NAMESPACE }}/{{ .ProjectName }}:latest"
+
+    # List of image templates to include in the manifest.
+    image_templates:
+      - "ghcr.io/{{ .Env.GHCR_NAMESPACE }}/{{ .ProjectName }}:amd64-latest"
+      - "ghcr.io/{{ .Env.GHCR_NAMESPACE }}/{{ .ProjectName }}:i386-latest"
+      - "ghcr.io/{{ .Env.GHCR_NAMESPACE }}/{{ .ProjectName }}:armhf-latest"
+      - "ghcr.io/{{ .Env.GHCR_NAMESPACE }}/{{ .ProjectName }}:arm64v8-latest"
+      - "ghcr.io/{{ .Env.GHCR_NAMESPACE }}/{{ .ProjectName }}:riscv64-latest"
+
+    # Whether to skip pushing the manifest to the registry.
+    # Default: false
+    skip_push: false
+
+  #   Docker Hub manifests - Uncomment to use
+  # - # ID of the manifest, used to reference in the `docker_signs` section.
+  #   id: dockerhub
+
+  #   # Name template for the manifest.
+  #   # Templates: allowed.
+  #   name_template: "{{ .Env.DOCKER_NAMESPACE }}/{{ .ProjectName }}:{{ .Tag }}"
+
+  #   # List of image templates to include in the manifest.
+  #   image_templates:
+  #     - "{{ .Env.DOCKER_NAMESPACE }}/{{ .ProjectName }}:amd64-{{ .Tag }}"
+  #     - "{{ .Env.DOCKER_NAMESPACE }}/{{ .ProjectName }}:i386-{{ .Tag }}"
+  #     - "{{ .Env.DOCKER_NAMESPACE }}/{{ .ProjectName }}:armhf-{{ .Tag }}"
+  #     - "{{ .Env.DOCKER_NAMESPACE }}/{{ .ProjectName }}:arm64v8-{{ .Tag }}"
+  #     - "{{ .Env.DOCKER_NAMESPACE }}/{{ .ProjectName }}:riscv64-{{ .Tag }}"
+
+  #   # Whether to skip pushing the manifest to the registry.
+  #   # Default: false
+  #   skip_push: false
+
+  # - # ID of the manifest, used to reference in the `docker_signs` section.
+  #   id: dockerhub_latest
+
+  #   # Name template for the manifest.
+  #   # Templates: allowed.
+  #   name_template: "{{ .Env.DOCKER_NAMESPACE }}/{{ .ProjectName }}:latest"
+
+  #   # List of image templates to include in the manifest.
+  #   image_templates:
+  #     - "{{ .Env.DOCKER_NAMESPACE }}/{{ .ProjectName }}:amd64-latest"
+  #     - "{{ .Env.DOCKER_NAMESPACE }}/{{ .ProjectName }}:i386-latest"
+  #     - "{{ .Env.DOCKER_NAMESPACE }}/{{ .ProjectName }}:armhf-latest"
+  #     - "{{ .Env.DOCKER_NAMESPACE }}/{{ .ProjectName }}:arm64v8-latest"
+  #     - "{{ .Env.DOCKER_NAMESPACE }}/{{ .ProjectName }}:riscv64-latest"
+
+  #   # Whether to skip pushing the manifest to the registry.
+  #   # Default: false
+  #   skip_push: false
+
+######################################################################################################
+# Image Signing Configuration
+# https://goreleaser.com/customization/docker_sign/
+######################################################################################################
+docker_signs:
+  - # Path to the signature command.
+    #
+    # Default: 'cosign'.
+    cmd: cosign
+
+    # Command line arguments for the command.
+    #
+    # Default: ["sign", "--key=cosign.key", "${artifact}@${digest}", "--yes"].
+    # Templates: allowed.
+    args:
+      - "sign"
+      - "${artifact}@${digest}"
+      - "--yes" # Non-interactive signing, per Sigstore CI Quickstart
+
+    # Which artifacts to sign.
+    #
+    #   all:       all artifacts
+    #   none:      no signing
+    #   images:    only docker images
+    #   manifests: only docker manifests
+    #
+    # Default: 'none'.
+    artifacts: images
+
+    # IDs of the artifacts to sign.
+    ids:
+      - amd64
+      - i386
+      - armhf
+      - arm64v8
+      - riscv64
+
+    # List of environment variables that will be passed to the signing command
+    # as well as the templates.
+    env:
+      - COSIGN_EXPERIMENTAL=true # Enable keyless signing
+
+    # By default, the stdout and stderr of the signing cmd are discarded unless
+    # GoReleaser is running with `--verbose` set.
+    # You can set this to true if you want them to be displayed regardless.
+    output: true
+
+  - # Path to the signature command.
+    #
+    # Default: 'cosign'.
+    cmd: cosign
+
+    # Command line arguments for the command.
+    #
+    # Default: ["sign", "--key=cosign.key", "${artifact}@${digest}", "--yes"].
+    # Templates: allowed.
+    args:
+      - "sign"
+      - "${artifact}@${digest}"
+      - "--yes" # Non-interactive signing, per Sigstore CI Quickstart
+
+    # Which artifacts to sign.
+    #
+    #   all:       all artifacts
+    #   none:      no signing
+    #   images:    only docker images
+    #   manifests: only docker manifests
+    #
+    # Default: 'none'.
+    artifacts: manifests
+
+    # IDs of the artifacts to sign.
+    ids:
+      - ghcr
+      - ghcr_latest
+      # - dockerhub
+      # - dockerhub_latest
+
+    # List of environment variables that will be passed to the signing command
+    # as well as the templates.
+    env:
+      - COSIGN_EXPERIMENTAL=true
+
+    # By default, the stdout and stderr of the signing cmd are discarded unless
+    # GoReleaser is running with `--verbose` set.
+    # You can set this to true if you want them to be displayed regardless.
+    output: true
 
 ######################################################################################################
 # Artifact Signing Configuration
 # https://goreleaser.com/customization/sign/
 ######################################################################################################
 signs:
-  - id: default
-    artifacts: all
+  - #
+    # ID of the sign config, must be unique.
+    #
+    # Default: 'default'.
+    id: default
+
+    # Name of the signature file.
+    #
+    # Default: '${artifact}.sig'.
+    # Templates: allowed.
+
+    # Path to the signature command
+    #
+    # Default: 'gpg'.
+    cmd: gpg
+
+    # Command line arguments for the command
+    #
+    # to sign with a specific key use
+    # args: ["-u", "<key id, fingerprint, email, ...>", "--output", "${signature}", "--detach-sign", "${artifact}"]
+    #
+    # Default: ["--output", "${signature}", "--detach-sign", "${artifact}"].
+    # Templates: allowed.
     args:
       - "--batch"
       - "--local-user"
@@ -440,6 +704,24 @@ signs:
       - "${signature}"
       - "--detach-sign"
       - "${artifact}"
+
+    # Which artifacts to sign
+    #
+    # Valid options are:
+    # - none        no signing
+    # - all:        all artifacts
+    # - checksum:   checksum files
+    # - source:     source archive
+    # - package:    Linux packages (deb, rpm, apk, etc)
+    # - installer:  Windows MSI installers (Pro only)
+    # - diskimage:  macOS DMG disk images (Pro only)
+    # - archive:    archives from archive pipe
+    # - sbom:       any SBOMs generated for other artifacts
+    # - binary:     binaries (only when `archives.format` is 'binary', use binaries_sign otherwise)
+    #
+    # Default: 'none'.
+    artifacts: all
+
 ######################################################################################################
 
 ######################################################################################################

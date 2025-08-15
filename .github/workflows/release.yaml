@@ -24,16 +24,16 @@ jobs:
       # docker_namespace: nickfedor
       ghcr_namespace: nicholas-fedor
 
-  manifest:
-    name: Create image manifests
-    needs: build
-    permissions:
-      contents: read # For code checkout
-      packages: write # For pushing manifests
-    secrets: inherit
-    uses: ./.github/workflows/create-manifests.yaml
-    with:
-      version: ${{ github.ref_name }} # Tag name (e.g., v1.2.3)
-      project_name: goreleaser-example
-      # docker_namespace: nickfedor
-      ghcr_namespace: nicholas-fedor
+  # manifest:
+  #   name: Create image manifests
+  #   needs: build
+  #   permissions:
+  #     contents: read # For code checkout
+  #     packages: write # For pushing manifests
+  #   secrets: inherit
+  #   uses: ./.github/workflows/create-manifests.yaml
+  #   with:
+  #     version: ${{ github.ref_name }} # Tag name (e.g., v1.2.3)
+  #     project_name: goreleaser-example
+  #     # docker_namespace: nickfedor
+  #     ghcr_namespace: nicholas-fedor

@@ -69,6 +69,9 @@ jobs:
       - name: Install Syft for SBOM generation # Install Syft for GoReleaser SBOM generation
         run: curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin
 
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@d58896d6a1865668819e1d91763c7751a165e159
+
       - name: Import GPG key
         uses: crazy-max/ghaction-import-gpg@e89d40939c28e39f97cf32126055eeae86ba74ec
         with:
@@ -97,60 +100,6 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
           # DOCKER_NAMESPACE: ${{ inputs.docker_namespace }}
           GHCR_NAMESPACE: ${{ inputs.ghcr_namespace }}
-
-      - name: Install Cosign
-        run: |
-          curl -sSfL https://github.com/sigstore/cosign/releases/latest/download/cosign-linux-amd64 -o /usr/local/bin/cosign
-          chmod +x /usr/local/bin/cosign
-
-      - name: Sign Docker Images with Cosign (Keyless)
-        run: |
-          for arch in amd64 i386 armhf arm64v8 riscv64; do
-            # Map architecture to platform components for docker buildx inspect
-            case $arch in
-              amd64) os="linux" architecture="amd64" variant="" ;;
-              i386) os="linux" architecture="386" variant="" ;;
-              armhf) os="linux" architecture="arm" variant="v6" ;;
-              arm64v8) os="linux" architecture="arm64" variant="v8" ;;
-              riscv64) os="linux" architecture="riscv64" variant="" ;;
-            esac
-            # Get the digest for the versioned tag (GHCR)
-            digest_version=$(docker buildx imagetools inspect ghcr.io/${{ inputs.ghcr_namespace }}/${{ inputs.project_name }}:${arch}-${{ github.ref_name }} --format '{{range .Manifest.Manifests}}{{if and (eq .Platform.OS "${os}") (eq .Platform.Architecture "${architecture}")}}{{if or (eq .Platform.Variant "${variant}") (eq "${variant}" "")}}{{.Digest}}{{end}}{{end}}{{end}}')
-            if [ -n "$digest_version" ]; then
-              cosign sign --yes ghcr.io/${{ inputs.ghcr_namespace }}/${{ inputs.project_name }}@${digest_version}
-            else
-              echo "Failed to retrieve digest for ${arch}-${{ github.ref_name }} (GHCR)"
-              exit 1
-            fi
-            # Get the digest for the latest tag (GHCR)
-            digest_latest=$(docker buildx imagetools inspect ghcr.io/${{ inputs.ghcr_namespace }}/${{ inputs.project_name }}:${arch}-latest --format '{{range .Manifest.Manifests}}{{if and (eq .Platform.OS "${os}") (eq .Platform.Architecture "${architecture}")}}{{if or (eq .Platform.Variant "${variant}") (eq "${variant}" "")}}{{.Digest}}{{end}}{{end}}{{end}}')
-            if [ -n "$digest_latest" ]; then
-              cosign sign --yes ghcr.io/${{ inputs.ghcr_namespace }}/${{ inputs.project_name }}@${digest_latest}
-            else
-              echo "Failed to retrieve digest for ${arch}-latest (GHCR)"
-              exit 1
-            fi
-            # Docker Hub signing (versioned tag)
-            # digest_docker_version=$(docker buildx imagetools inspect ${{ inputs.docker_namespace }}/${{ inputs.project_name }}:${arch}-${{ github.ref_name }} --format '{{range .Manifest.Manifests}}{{if and (eq .Platform.OS "${os}") (eq .Platform.Architecture "${architecture}")}}{{if or (eq .Platform.Variant "${variant}") (eq "${variant}" "")}}{{.Digest}}{{end}}{{end}}{{end}}')
-            # if [ -n "$digest_docker_version" ]; then
-            #   cosign sign --yes ${{ inputs.docker_namespace }}/${{ inputs.project_name }}@${digest_docker_version}
-            # else
-            #   echo "Failed to retrieve digest for ${arch}-${{ github.ref_name }} (Docker Hub)"
-            #   exit 1
-            # fi
-            # Docker Hub signing (latest tag)
-            # digest_docker_latest=$(docker buildx imagetools inspect ${{ inputs.docker_namespace }}/${{ inputs.project_name }}:${arch}-latest --format '{{range .Manifest.Manifests}}{{if and (eq .Platform.OS "${os}") (eq .Platform.Architecture "${architecture}")}}{{if or (eq .Platform.Variant "${variant}") (eq "${variant}" "")}}{{.Digest}}{{end}}{{end}}{{end}}')
-            # if [ -n "$digest_docker_latest" ]; then
-            #   cosign sign --yes ${{ inputs.docker_namespace }}/${{ inputs.project_name }}@${digest_docker_latest}
-            # else
-            #   echo "Failed to retrieve digest for ${arch}-latest (Docker Hub)"
-            #   exit 1
-            # fi
-          done
-        env:
-          COSIGN_EXPERIMENTAL: "true"
-          COSIGN_YES: "true" # Automatically accept Sigstore terms (redundant with --yes but kept for compatibility)
-        shell: bash
 
       - name: Upload binary SBOMs # Upload SBOMs for prod builds.
         uses: actions/upload-artifact@de65e23aa2b7e23d713bb51fbfcb6d502f8667d8
