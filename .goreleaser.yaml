@@ -526,11 +526,11 @@ docker_manifests:
 
     # List of image templates to include in the manifest.
     image_templates:
-      - "ghcr.io/{{ .Env.GHCR_NAMESPACE }}/{{ .ProjectName }}:amd64-latest"
-      - "ghcr.io/{{ .Env.GHCR_NAMESPACE }}/{{ .ProjectName }}:i386-latest"
-      - "ghcr.io/{{ .Env.GHCR_NAMESPACE }}/{{ .ProjectName }}:armhf-latest"
-      - "ghcr.io/{{ .Env.GHCR_NAMESPACE }}/{{ .ProjectName }}:arm64v8-latest"
-      - "ghcr.io/{{ .Env.GHCR_NAMESPACE }}/{{ .ProjectName }}:riscv64-latest"
+      - "ghcr.io/{{ .Env.GHCR_NAMESPACE }}/{{ .ProjectName }}:amd64-{{ .Tag }}"
+      - "ghcr.io/{{ .Env.GHCR_NAMESPACE }}/{{ .ProjectName }}:i386-{{ .Tag }}"
+      - "ghcr.io/{{ .Env.GHCR_NAMESPACE }}/{{ .ProjectName }}:armhf-{{ .Tag }}"
+      - "ghcr.io/{{ .Env.GHCR_NAMESPACE }}/{{ .ProjectName }}:arm64v8-{{ .Tag }}"
+      - "ghcr.io/{{ .Env.GHCR_NAMESPACE }}/{{ .ProjectName }}:riscv64-{{ .Tag }}"
 
     # Whether to skip pushing the manifest to the registry.
     # Default: false
