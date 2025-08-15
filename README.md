@@ -1,5 +1,8 @@
 # GoReleaser Example: Multi-Platform Docker Images with Attestations
 
+> [!Warning]
+> This is currently a work in progress
+
 This repository demonstrates how to use [GoReleaser](https://goreleaser.com) to build and release multi-platform Docker images with full SLSA provenance and SBOM (Software Bill of Materials) attestations for a simple Go application. The example application is a lightweight web server that listens on port 8080 and responds with "Hello World!" along with the current timestamp.
 
 The primary goal is to provide a clear, reproducible setup for creating multi-architecture Docker images (supporting `amd64`, `386`, `arm/v6`, `arm64`, and `riscv64`) with attestations, leveraging GoReleaser and GitHub Actions. This addresses the limited documentation available for GoReleaser users building multi-platform Docker images with security-focused attestations.
