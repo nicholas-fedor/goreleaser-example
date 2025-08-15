@@ -580,7 +580,13 @@ docker_manifests:
 # https://goreleaser.com/customization/docker_sign/
 ######################################################################################################
 docker_signs:
-  - # Path to the signature command.
+  - # ID of the sign config, must be unique.
+    # Only relevant if you want to produce some sort of signature file.
+    #
+    # Default: 'default'.
+    id: images
+
+    # Path to the signature command.
     #
     # Default: 'cosign'.
     cmd: cosign
@@ -622,7 +628,13 @@ docker_signs:
     # You can set this to true if you want them to be displayed regardless.
     output: true
 
-  - # Path to the signature command.
+  - # ID of the sign config, must be unique.
+    # Only relevant if you want to produce some sort of signature file.
+    #
+    # Default: 'default'.
+    id: manifests
+
+    # Path to the signature command.
     #
     # Default: 'cosign'.
     cmd: cosign
